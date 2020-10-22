@@ -10,6 +10,7 @@ a # results in error, values equal to words (denoted as characters) within "" or
 
 # Saving values as objects using <-
 x <- 1
+x = 1
 print(x=x)
 print(x)
 x # reference to saved object x.  When by itself prints object
@@ -40,11 +41,11 @@ list(list(c(1,2,3,4), c("a","b")), list(c(5,6,7,8), c("c","d")))
 matrix(c(1,2,3,4), nrow=2, ncol=2)
 matrix(c("a","b","c","d"), nrow=2, ncol=2)
 matrix(c("a","b",3,4), nrow=2, ncol=2) 
-# like vectors, all values of same type or error :(
+# like vectors, all values of same type
 matrix(c("a","b","3","4"), nrow=2, ncol=2) 
 # but numbers can be denoted as characters using quotes
 
-## Arithmetic 
+# Arithmetic 
 sum(1,1)
 1+1 # alias is +, alias means alternative name or "shortcut"
 x <- 1
@@ -77,7 +78,7 @@ x <- prod(2,1/2) # result of function call prod(2,1/2) saved as object x
 TRUE # special type: called logical
 FALSE # other logical value. Used to test conditions (discussed later)
 NA # denotes "missing value"
-"hello world! :/\0" # characters can have spaces, non-letter symbols, numbers, ...
+"hello world! :0" # characters can have spaces, non-letter symbols, numbers, ...
 x y <- "won't work" # R object names CANNOT have spaces
 x_y <- "will work"
 1_y <- "won't work" # R object names CANNOT start with numbers
@@ -91,7 +92,7 @@ class(TRUE) # logical
 # Recall matrices, all values must of same type
 # How then do we store datasets with variables of different types?
 # Data frames to the rescue!
-x <- data.frame(c(1,2,3,4), c("a,b,c,d")) # each argument is a new column
+x <- data.frame(c(1,2,3,4), c("a","b","c","d")) # each argument is a new column
 x # have 2 columns, one of numbers and one of characters
 class(x) # can see of special class called data.frame
 typeof(x) # but is actually just a special type of list
