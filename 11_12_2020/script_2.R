@@ -8,6 +8,7 @@ library(tidyverse)
 
 data <- read.csv(file="../Data/AOSI_small.csv", na.strings = ".")
 names(data) # quick way of viewing all variables in data frame
+View(data)
 
 ## Select
 #  select() function used to remove variables and/or order them

@@ -86,7 +86,7 @@ x$obj_1
 
 ## Data frames
 # Data frames are just lists, so we can use the examples above 
-data <- read.csv(file="../Data/AOSI_small.csv", na.strings = ".")
+data <- read.csv(file="../Data/AOSI_small.csv", na.strings = c(".","","NA"))
 data[[1]]
 # Each column of a data frame is an element of the list.  We select the 1st column
 data$Identifiers
