@@ -1,0 +1,78 @@
+---
+title: "12/10/2020 Example"
+author: "Kevin Donovan"
+date: "12/10/2020"
+output: html_document
+---
+
+```{r setup}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE)
+```
+
+```{r packages}
+library(tidyverse)
+library(readr)
+library(gtsummary)
+library(gt)
+library(flextable)
+library(rmarkdown)
+library(DT)
+```
+
+# Introduction
+
+This an example of using R Markdown with IBIS data.
+
+```{r data_management}
+ibis_data <- read_csv("../Data/Cross-sec_full.csv", na = c(".","","NA"))
+```
+
+# Summary Statistics
+```{r summ_stats}
+tf <- tbl_summary(ibis_data, by="GROUP") %>%
+  as_flex_table()
+
+tf
+
+save_as_docx(tf, path="summ_stats.docx")
+```
+
+# Interactive Tables
+```{r int_table}
+paged_table(ibis_data)
+
+datatable(ibis_data)
+```
+
+# First Analysis
+First we visualize AOSI total score and Mullen composite score at 6 months using a 2D scatterplot.  We also color by diagnosis, panel by gender, and we include trend lines for the whole sample and by gender.
+
+```{r v06_aosi_mullen_plot}
+plot(x=ibis_data$`V06 aosi,total_score_1_18`, 
+     y=ibis_data$`V06 mullen,composite_standard_score`)
+
+ggplot(data=ibis_data, mapping=aes(x=`V06 aosi,total_score_1_18`,
+                                   y=`V06 mullen,composite_standard_score`,
+                                   color=SSM_ASD_v24))+
+  geom_point()+
+  geom_smooth(se=FALSE)+
+  geom_smooth(color="blue")+
+  facet_grid(~Gender)+
+  labs(title="My title", subtitle = "My subtitle", caption="My footer",
+       color=" 24 month ASD diagnosis")+
+  xlab("6 month AOSI\nTotal Score")+
+  ylab("6 month MSEL\nComposite Std. Score")
+```
+
+# Additional Tables Resources
+Links for help with these table packages:
+
+[Basic help](https://rstudio.github.io/distill/tables.html)
+
+[datatable](https://rstudio.github.io/DT/)
+
+[gt](https://gt.rstudio.com/)
+
+[flextable](https://davidgohel.github.io/flextable/index.html)
+
+[gtsummary](http://www.danieldsjoberg.com/gtsummary/)
