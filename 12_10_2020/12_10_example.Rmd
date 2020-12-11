@@ -38,7 +38,7 @@ save_as_docx(tf, path="summ_stats.docx")
 ```
 
 # Interactive Tables
-```{r int_table}
+```{r int_table, eval=FALSE}
 paged_table(ibis_data)
 
 datatable(ibis_data)
