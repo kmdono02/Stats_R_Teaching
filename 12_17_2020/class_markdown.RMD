@@ -1,0 +1,73 @@
+---
+title: 'Advanced Data Wrangling'
+author: "Kevin Donovan"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: slidy_presentation
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE, results='asis', fig.width=6, fig.height=6)
+
+library(tidyverse)
+library(readr)
+library(sf)
+```
+
+# Introduction 
+
+**Recall**: data wrangling covered using tidyverse
+
+Functions:  
+
+- mutate()  
+- select()  
+- filter()  
+- arrange()  
+
+<center>
+<figure>
+    <img src='images/tidyverse.png' alt='missing' width="500"/>
+    <figcaption>Tidyverse</figcaption>
+</figure>
+</center>
+
+# Combinating Functions 
+
+Often need to combine with **helper functions** to create variables for analysis
+
+Helpers:  
+
+- if(...){}else{...}  
+- ifelse()  
+- paste(), paste0()  
+- gsub(), grepl(), %in%
+- relevel(), relabel()
+- summarise()
+- pivot_wider(), pivot_longer(), gather(), spread()
+
+# Examples in IBIS Data
+
+1. Create ASD by familial risk grouping variable 
+2. Change reference level of category for regression analysis
+3. Create normalized scores of variable
+4. Re-group demographics variables (race, sex, gender, etc.)
+5. Convert from wide to long (vice-versa)
+6. Compute means and SDs for variables by groups
+
+# Song of the Session
+
+[Lovers Rock directed by Steve McQueen](https://www.amazon.com/Mangrove/dp/B08J5DCR24/ref=sr_1_1?dchild=1&keywords=small+axes&qid=1608056266&rnid=2941120011&s=movies-tv&sr=1-1)
+
+[Silly Games by Janet Key](https://www.youtube.com/watch?v=GFHqabGMZOM)
+
+[Hello Stranger by Brown Sugar](https://www.youtube.com/watch?v=b4QLoog5740)
+
+[I'm in Love With a Dreadlocks by Brown Sugar](https://www.youtube.com/watch?v=K8fP-fmsDfw)
+
+[Lovers Rock by The Clash](https://www.youtube.com/watch?v=bsmBnB0rrdI)
+
+<center>
+<figure>
+    <img src='images/lovers_rock.jpg' alt='missing' width="500"/>
+    <figcaption>Tidyverse</figcaption>
+</figure>
+</center>
