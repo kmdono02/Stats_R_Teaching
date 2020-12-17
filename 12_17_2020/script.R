@@ -22,16 +22,20 @@ gsub("Pos", "ASD", "HR_Pos")
 gsub("V", "", "V24")
 
 # 3) if...else and ifelse()
-condition <- "GO"
-condition <- "STOP"
+condition_1 <- "GO"
+condition_1 <- "STOP"
 
-if(condition=="GO"){
+condition_2 <- "REALLY GO"
+
+if(condition_1=="GO"|condition_2=="REALLY GO"){
+  print(2+2)
   print("PASS")
 }else{
+  print(2-2)
   print("FAIL")
 }
 
-ifelse(condition=="GO", "PASS", "FAIL")
+ifelse(condition_1=="GO", "PASS", "FAIL")
 
 # Now let's start the pasting process
 data_v1 <-
@@ -52,7 +56,7 @@ ftable(data_v1$`V24 demographics,Risk`)
 # Let's try to get the two group variables to match
 data_v1 <-
   data %>%
-  mutate(GROUP_v0 = ifelse(grepl("YES", SSM_ASD_v24), 
+  mutate(GROUP_v0 = ifelse(grepl("YES", SSM_ASD_v24),
                            paste0(`V24 demographics,Risk`,"_","ASD"),
                            ifelse(grepl("NO", SSM_ASD_v24), 
                                   paste0(`V24 demographics,Risk`,"_","neg"), NA)))
@@ -61,7 +65,8 @@ ftable(data_v1$GROUP, data_v1$GROUP_v0)
 # Great! Let's just remove the 36
 data_v1 <-
   data %>%
-  mutate(GROUP_v0 = gsub("_36_","_" , ifelse(grepl("YES", SSM_ASD_v24), 
+  mutate(GROUP_v0 = gsub("_36_","_" , 
+                         ifelse(grepl("YES", SSM_ASD_v24), 
                            paste0(`V24 demographics,Risk`,"_","ASD"),
                            ifelse(grepl("NO", SSM_ASD_v24), 
                                   paste0(`V24 demographics,Risk`,"_","neg"), NA))))
@@ -173,3 +178,4 @@ data_long$visit_num
 # Why did we have to remove the V first before converting to numeric with as.numeric()?
 
 # b) requests?
+# str_split()
