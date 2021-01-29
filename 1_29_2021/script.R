@@ -32,6 +32,9 @@ cor.test(x=full_data$V12_mullen_composite_standard_score, y=full_data$V12_aosi_t
 # Model AOSI TS at 12 months as a linear fn of Mullen composite at 12 months and age at 12 month visit
 lm(V12_aosi_total_score_1_18~V12_mullen_composite_standard_score+V12_mullen_Candidate_Age, data=full_data)
 
+full_data %>%
+  filter(is.na(V12_aosi_total_score_1_18)==0&is.na(V12_mullen_composite_standard_score)==0)
+
 # Save results to access later if needed; use sumary fn to get usual results table
 lm_fit <- lm(V12_aosi_total_score_1_18~V12_mullen_composite_standard_score+
                V12_mullen_Candidate_Age, data=full_data)
@@ -47,7 +50,8 @@ lm_fit_results_table <- lm_fit_results_table %>%
          term=fct_recode(factor(term),
                          "Intercept"="(Intercept)",
                          "12 Month MSEL Composite SS"="V12_mullen_composite_standard_score",
-                         "12 Month Visit Age"="V12_mullen_Candidate_Age"))
+                         "12 Month Visit Age"="V12_mullen_Candidate_Age"),
+         model="MSEL Composite")
 
 flextable(data=lm_fit_results_table) %>%
   set_header_labels(term="Variable",
@@ -60,6 +64,41 @@ flextable(data=lm_fit_results_table) %>%
 # Let's look at all the output from the model in detail
 lm_fit
 summary(lm_fit)
+
+# Let's look at another model and compare the results in one table
+lm_fit_2 <-
+  lm(V12_aosi_total_score_1_18~V12_mullen_cognitive_t_score_sum+V12_mullen_Candidate_Age, data=full_data)
+
+lm_fit_results_table_2 <- tidy(lm_fit_2) %>%
+  mutate(p.value=ifelse(p.value<0.005, "<0.005", 
+                        as.character(round(p.value, 3))),
+         term=fct_recode(factor(term),
+                         "Intercept"="(Intercept)",
+                         "12 Month MSEL Cognitive T-Score"="V12_mullen_cognitive_t_score_sum",
+                         "12 Month Visit Age"="V12_mullen_Candidate_Age"),
+         model="MSEL Cognitive")
+
+lm_table_all <- rbind(lm_fit_results_table %>% select(model, everything()), 
+                      lm_fit_results_table_2 %>% select(model, everything()))
+
+# Use the fn colformat_double() to round to 2 places
+# Use merge_v to remove duplicate model labels
+# Use valign to vertically align the cells
+# What happens if you remove merge_v, valign, fix_border_issues?
+# Why were the p values also rounded to 2 places
+
+flextable(data=lm_table_all) %>%
+  colformat_double(digits=2) %>%
+  set_header_labels("model"="Model",
+                    "term"="Variable",
+                    "estimate"="Estimate",
+                    "std.error"="Std. Error",
+                    "statistic"="T Statistic",
+                    "p.value"="P-value") %>%
+  merge_v(j=1) %>%
+  valign(valign = "top") %>%
+  autofit() %>%
+  fix_border_issues()
 
 # Let's do some diagnostics
 # 1. Linear Fit
