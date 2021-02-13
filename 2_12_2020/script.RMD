@@ -1,0 +1,182 @@
+---
+title: "Mixed Model Example Code"
+author: "BIOS 635"
+date: "2/12/2021"
+output: html_document
+---
+```{r ch7_setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, 
+                      messages = FALSE, 
+                      warning = FALSE)
+```
+
+```{r ch7_load}
+library(tidyverse)
+library(readr)
+library(shiny)
+library(rmarkdown)
+library(dagitty)
+library(ggdag)
+library(broom)
+library(flextable)
+library(ggpubr)
+library(nlme)
+library(lme4)
+library(mice)
+library(naniar)
+```
+
+```{r}
+# Read in data and convert from wide to long
+full_data <- read_csv("../Data/Cross-sec_full.csv", na=c(".", "", " "))
+
+names(full_data) <- gsub(" |,",".",names(full_data))
+```
+
+### Example: Mullen composite and Visit
+When running a mixed model in R, the data must be **long** form.  That is, each observation for a subject must be a separate row in your data.  The R code below converts the dataset to long form (this is the same code as was used in the long form example in Chapter 4).  
+
+```{r convert_long}
+mixed_model_data <- full_data %>%
+  select(Identifiers, GROUP, Gender,
+         V36.mullen.composite_standard_score:V12.mullen.composite_standard_score)
+
+vars_to_convert <- names(mixed_model_data)[c(-1,-2,-3)]
+
+mixed_model_data <- mixed_model_data %>%
+  gather(variable, var_value, vars_to_convert) %>%
+  separate(variable,c("Visit","Variable"),sep=3) %>% 
+  spread(key=Variable, value=var_value) %>%
+  plyr::rename(c(".mullen.composite_standard_score"="Mullen_Composite_Score")) %>%
+  mutate(ASD_Diag = factor(ifelse(grepl("ASD", GROUP), "ASD_Neg", "ASD_Pos")),
+         Visit=factor(Visit),
+         Visit_Num=as.numeric(Visit)-1,
+         Mullen_Composite_Score=as.numeric(Mullen_Composite_Score)) %>%
+  arrange(Identifiers, Visit)
+```
+
+Now, let us fit model Mullen composite score as the outcome and visit number (1st, 2nd, 3rd, or 4th) and ASD diagnosis (positive or negative) as covariates.  Note that in order for the intercept in the model to be interpretable, we code visit so that 0 reflects the first visit, 1 reflects the second visit, etc.  We fit the following random intercept-only model:
+
+$Mullen_{ij}=\beta_{0}+\beta_{1}Visit_{ij}+\beta_{2}Group_{ij}+\phi_{i}+\epsilon_{ij}$
+
+where $\phi_i$ are independent across index $i$ and $\epsilon_{ij}$ are independent across $i$.
+
+To fit this model in R, we can either use the **lme4** package or the **nlme** package.  The **nlme** package is more flexible, so it is covered here.  The function used from this package is called **lme()**, and it works similarly to the **lm()**.
+
+```{r nlme_fit}
+# Fitt mixed effects model
+mixed_fit <-
+  lme(Mullen_Composite_Score~Visit_Num + ASD_Diag, 
+    data=mixed_model_data,
+    random = ~1|Identifiers,
+    na.action = na.omit)
+```
+
+```{r nlme_fit_1}
+# Print out fixed effects results and other useful results
+summary(mixed_fit)
+
+# Print out F-tests
+anova.lme(mixed_fit)
+
+# Print out the random effect variance-covariance matrix
+getVarCov(mixed_fit)
+
+# Print out the residual variance-covariance matrix
+getVarCov(mixed_fit, type="conditional", individuals="1")
+
+# Print out boxplot of random intercepts, byt diagnosis group
+# First get dataset used in mixed effect model (i.e. removing missing values)
+mixed_effect_data <- getData(mixed_fit)
+
+# Add random intercepts using predict()
+mixed_effect_data <- data.frame(mixed_effect_data %>%
+                                  select(Identifiers, GROUP) %>%
+                                  distinct(.),
+                                "random_ints"=mixed_fit$coefficients$random$Identifiers)
+
+# Now plot
+ggplot(data=mixed_effect_data,
+       mapping=aes(x=GROUP, y=`X.Intercept.`, fill=GROUP))+
+  geom_boxplot()
+```
+
+```{r nlme_fit_random_effects_2}
+mixed_effect_data_complete <- getData(mixed_fit)
+
+# Add predicted values using predict function
+mixed_effect_data_complete <- data.frame(mixed_effect_data_complete, predict(mixed_fit))
+
+ggplot(data=mixed_effect_data_complete, mapping=aes(x=Visit, 
+                                          y=predict.mixed_fit.,
+                                          color=ASD_Diag,
+                                          group=Identifiers))+
+  geom_point()+
+  geom_line()+
+  labs(y="Fitted Value: Mullen Composite", 
+       title="Mixed model fitted values without interaction term")
+```
+
+Note that no interaction terms between visit and ASD diagnosis were included  It may make sense to include an interaction term between these variables; this would imply that the change in Mullen composite score over time is different between the ASD diagnosis groups.  That model would be the following:
+
+$Mullen_{ij}=\beta_{0}+\beta_{1}Visit_{ij}+\beta_{2}Group_{ij}+\beta_{3}Group_{ij}*Visit_{ij}+\phi_{i}+\epsilon_{ij}$
+where $\phi_i$ are independent across index $i$ and $\epsilon_{ij}$ are independent across $i$.
+
+```{r nlme_fit_2}
+# Fit model
+mixed_fit_interact <-
+  lme(Mullen_Composite_Score~Visit_Num + ASD_Diag + Visit_Num*ASD_Diag, 
+    data=mixed_model_data,
+    random = ~1|Identifiers,
+    na.action = na.omit)
+
+# Print out results
+summary(mixed_fit_interact)
+
+# Create plot
+mixed_effect_data_complete <- getData(mixed_fit_interact)
+mixed_effect_data_complete <- data.frame(mixed_effect_data_complete, predict(mixed_fit_interact))
+
+ggplot(data=mixed_effect_data_complete, mapping=aes(x=Visit, 
+                                          y=predict.mixed_fit_interact.,
+                                          color=ASD_Diag,
+                                          group=Identifiers))+
+  geom_point()+
+  geom_line()+
+  labs(y="Fitted Value: Mullen Composite", 
+       title="Mixed model fitted values with interaction term")
+
+```
+
+Finally, we consider also adding in a random slope for age, to reflect subject-specific age trajectories:
+
+$Mullen_{ij}=\beta_{0}+\beta_{1}Visit_{ij}+\beta_{2}Group_{ij}+\beta_{3}Group_{ij}*Visit_{ij}+\phi_{0,i}+\phi_{1,i}Visit_{ij}+\epsilon_{ij}$
+where $\phi_i$ are independent across index $i$ and $\epsilon_{ij}$ are independent across $i$.
+
+```{r nlme_fit_3}
+## Fit model
+mixed_fit_interact_rand_slope <-
+  lme(Mullen_Composite_Score~Visit_Num + ASD_Diag + Visit_Num*ASD_Diag, 
+    data=mixed_model_data,
+    random = ~1+Visit_Num|Identifiers,
+    na.action = na.omit)
+
+## Print out resultsmixed_effect_data_complete$
+summary(mixed_fit_interact_rand_slope)
+
+## Create plot
+mixed_effect_data_complete <- getData(mixed_fit_interact_rand_slope)
+mixed_effect_data_complete <- 
+  data.frame(mixed_effect_data_complete, "predicted_value"=predict(mixed_fit_interact_rand_slope))
+# Notice above, we create variable "predicted_value" to hold each subject's fitted values, including random effect realizations, in dataset called mixed_effect_data_complete ("complete" meaning all subjects with missing data for variables in model are removed from dataset to be used in plot)
+
+ggplot(data=mixed_effect_data_complete, mapping=aes(x=Visit, 
+                                          y=predicted_value,
+                                          color=ASD_Diag,
+                                          group=Identifiers))+
+  geom_point()+
+  geom_line()+
+  labs(y="Fitted Value: Mullen Composite", 
+       title="Mixed model fitted values with interaction term\nand random slope for visit")
+
+```
