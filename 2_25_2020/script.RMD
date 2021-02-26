@@ -1,0 +1,240 @@
+---
+title: "GLM Example Code"
+author: "Kevin Donovan"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: html_document
+---
+```{r ch7_setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, 
+                      messages = FALSE, 
+                      warning = FALSE)
+```
+
+```{r ch7_load}
+library(tidyverse)
+library(broom)
+library(flextable)
+library(caret)
+library(pROC)
+```
+
+```{r}
+# Read in data and convert from wide to long
+ibis_data <- read_csv("../Data/Cross-sec_full.csv", na=c(".", "", " ")) %>%
+  mutate(SSM_ASD_v24_num = ifelse(SSM_ASD_v24=="YES_ASD", 1,
+                                  ifelse(SSM_ASD_v24=="NO_ASD", 0, NA)))
+
+names(ibis_data) <- gsub(" |,",".",names(ibis_data))
+```
+
+# Example 1: Logistic regression with single predictor
+
+```{r, error=TRUE}
+# Fit model, 24 month MSEL composite standard score as predictor
+logistic_fit <- glm(SSM_ASD_v24~V24.mullen.composite_standard_score, 
+              family=binomial(),
+             data=ibis_data)
+## Return error? ASD variable is character, must be factor or numeric
+
+logistic_fit <- glm(factor(SSM_ASD_v24)~V24.mullen.composite_standard_score, 
+              family=binomial(),
+             data=ibis_data)
+logistic_fit
+# Note, category order with factors automatically alphabetical.  First set to "reference", ok in this case (as NO comes before YES)
+
+logistic_fit <- glm(SSM_ASD_v24_num~V24.mullen.composite_standard_score, 
+              family=binomial(),
+             data=ibis_data)
+logistic_fit
+# Same results
+
+# Raw output
+summary(logistic_fit)
+
+# Format output
+tidy(logistic_fit) %>%
+  mutate(p.value=ifelse(p.value<0.005, "<0.005", 
+                        as.character(round(p.value, 3))),
+         term=fct_recode(factor(term),
+                         "Intercept"="(Intercept)",
+                         "24 Month MSEL Composite Standard Score"=
+                         "V24.mullen.composite_standard_score")) %>%
+  flextable() %>%
+  set_header_labels("term"="Variable",
+                    "estimate"="Estimate",
+                    "std.error"="Std. Error",
+                    "statistic"="Z Statistic",
+                    "p.value"="P-value") %>%
+  autofit()
+
+```
+
+# Example 2: Logistic regression with many predictors
+
+```{r, error=TRUE}
+# Fit model, 24 month MSEL composite standard score, gender, and site as predictors
+logistic_fit <- 
+  glm(factor(SSM_ASD_v24)~V24.mullen.composite_standard_score+Gender+Study_Site, 
+              family=binomial(),
+             data=ibis_data)
+
+# Raw output
+summary(logistic_fit)
+
+# Format output
+tidy(logistic_fit) %>%
+  mutate(p.value=ifelse(p.value<0.005, "<0.005***", 
+                        as.character(round(p.value, 3))),
+         term=fct_recode(factor(term),
+                         "Intercept"="(Intercept)",
+                         "24 Month MSEL Composite Standard Score"=
+                         "V24.mullen.composite_standard_score",
+                         "Male Gender"="GenderMale",
+                         "Seattle Site"="Study_SiteSEA",
+                         "St. Louis Site"="Study_SiteSTL",
+                         "Chapel Hill Site"="Study_SiteUNC")) %>%
+  flextable() %>%
+  set_header_labels("term"="Variable",
+                    "estimate"="Estimate",
+                    "std.error"="Std. Error",
+                    "statistic"="Z Statistic",
+                    "p.value"="P-value") %>%
+  autofit()
+```
+
+# Extracting estimated probabilities (in Example 1)
+
+```{r, error=TRUE}
+# Fit model, 24 month MSEL composite standard score as predictor
+logistic_fit <- glm(factor(SSM_ASD_v24)~V24.mullen.composite_standard_score, 
+              family=binomial(),
+             data=ibis_data)
+
+# Output estimated probabilities of ASD from model, can use predict() fn
+ibis_data$estimated_asd_probabilities <- 
+  predict(logistic_fit, type="response")
+
+# Provides error about different lengths.  Why?
+# If one has a missing MSEL, can't compute probability from model
+sum(is.na(ibis_data$V24.mullen.composite_standard_score)) # have 14 missing values
+
+# Thus, need to compute and add estimated probabilities to dataset WITHOUT missing MSEL
+# Easy way, use model.frame()
+
+ibis_data_glm <- model.frame(logistic_fit)
+ibis_data_glm$estimated_asd_probabilities <- 
+  predict(logistic_fit, type="response", newdata=ibis_data_glm)
+# newdata argument specifies dataset you want to compute est. probabilities based on model
+
+# Now, can plot these probabilities
+ggplot(data = ibis_data_glm %>% 
+         mutate(SSM_ASD_v24_num = ifelse(`factor(SSM_ASD_v24)`=="YES_ASD", 1,
+                                  ifelse(`factor(SSM_ASD_v24)`=="NO_ASD", 0, NA))), 
+       mapping = aes(x=V24.mullen.composite_standard_score, y=SSM_ASD_v24_num))+
+  geom_point(aes(color=factor(SSM_ASD_v24_num)))+
+  geom_line(mapping=aes(y=estimated_asd_probabilities))+
+  scale_y_continuous(breaks=seq(0, 1.2, 0.2))+
+  labs(x="24 Month MSEL Composite Score", y="ASD Diagnosis (1=YES)",
+       color="ASD Diagnosis")+
+  theme_classic()+
+  theme(legend.position = "none")
+```
+
+# Extracting estimated probabilities (in Example 2)
+
+```{r, error=TRUE}
+# Fit model, 24 month MSEL composite standard score, gender, and site as predictors
+logistic_fit <- 
+  glm(factor(SSM_ASD_v24)~V24.mullen.composite_standard_score+Gender+Study_Site, 
+              family=binomial(),
+             data=ibis_data)
+
+# Output estimated probabilities of ASD from model, can use predict() fn
+ibis_data_glm <- model.frame(logistic_fit)
+ibis_data_glm$estimated_asd_probabilities <- 
+  predict(logistic_fit, type="response", newdata=ibis_data_glm)
+
+# Look at estimated probabilities by diagnosis
+ggplot(data=ibis_data_glm,
+       mapping=aes(x=`factor(SSM_ASD_v24)`, y=estimated_asd_probabilities,
+                   fill=`factor(SSM_ASD_v24)`))+
+  geom_boxplot()+
+  labs(y="Estimated probability\nof ASD diagnosis",
+       x="True diagnosis")+
+  theme_classic()+
+  theme(legend.position = "none",
+        text=element_text(size=20))
+```
+
+# Predicting diagnosis (in Example 2)
+Two options:
+- 1. Threshold estimated probabilities (ex. using 0.5 as cut-off)
+- 2. Examine performance across many thresholds using Receiver Operating Characteristic (ROC) Curve
+
+```{r, error=TRUE}
+# Fit model, 24 month MSEL composite standard score, gender, and site as predictors
+logistic_fit <- 
+  glm(factor(SSM_ASD_v24)~V24.mullen.composite_standard_score+Gender+Study_Site, 
+              family=binomial(),
+             data=ibis_data)
+
+# Output estimated probabilities of ASD from model, can use predict() fn
+ibis_data_glm <- model.frame(logistic_fit)
+ibis_data_glm$estimated_asd_probabilities <- 
+  predict(logistic_fit, type="response", newdata=ibis_data_glm)
+
+# Add in predictions using thresholding
+ibis_data_glm <-
+  ibis_data_glm %>%
+  mutate(pred_asd = 
+           relevel(factor(ifelse(estimated_asd_probabilities>0.5, "YES_ASD", "NO_ASD")),
+                   ref = "NO_ASD"))
+
+# Compute confusion matrix
+confusionMatrix(data = ibis_data_glm$pred_asd,
+                reference = ibis_data_glm$`factor(SSM_ASD_v24)`,
+                positive = "YES_ASD")
+
+# Now, examine ROC curve
+# Using pROC, add ROC curve using estimated probabilities of heart disease in test set
+roc_obj <- 
+  roc(response = ibis_data_glm$`factor(SSM_ASD_v24)`, 
+    predictor = ibis_data_glm$estimated_asd_probabilities)
+
+# Print obj
+roc_obj
+
+# Return max Youden's index, with specificity and sensitivity
+best_thres_data <- 
+  data.frame(coords(roc_obj, x="best", best.method = c("youden")))
+
+best_thres_data
+
+# Plot curve, add in line at elbow point
+data_add_line <-
+  data.frame("sensitvity"=c(1-best_thres_data$specificity,
+                            best_thres_data$sensitivity),
+             "specificity"=c(best_thres_data$specificity,
+                            best_thres_data$specificity))
+  
+ggroc(roc_obj)+
+    geom_point(
+    data = best_thres_data,
+    mapping = aes(x=specificity, y=sensitivity), size=2, color="red")+
+    geom_point(mapping=aes(x=best_thres_data$specificity, 
+               y=1-best_thres_data$specificity), 
+               size=2, color="red")+
+    geom_segment(aes(x = 1, xend = 0, y = 0, yend = 1),
+                 color="darkgrey", linetype="dashed")+
+    geom_text(data = best_thres_data,
+              mapping=aes(x=specificity, y=1,
+                          label=paste0("Threshold = ", round(threshold,2),
+                                       "\nSensitivity = ", round(sensitivity,2),
+                                       "\nSpecificity = ", round(specificity,2),
+                                       "\nAUC = ", round(auc(roc_obj),2))))+
+    geom_line(data=data_add_line,
+              mapping=aes(x=specificity, y=sensitvity),
+              linetype="dashed")+
+  ylim(c(0, 1.075))+
+  theme_classic()
+```
