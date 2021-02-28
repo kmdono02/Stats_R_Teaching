@@ -270,10 +270,10 @@ Model-based estimated probabilities (non-centered):
 For patient with MSEL=100 (mean in population for standard score)
 
 $$
-\hat{\text{Pr}}[Y=1|ASD=\text{YES}|MSEL=90]=\frac{e^{6.67-0.09*90}}{1+e^{6.67-0.09*90}}=0.19
+\hat{\text{Pr}}[ASD=\text{YES}|MSEL=90]=\frac{e^{6.67-0.09*90}}{1+e^{6.67-0.09*90}}=0.19
 $$
 
-Based on $\hat{\text{Pr}}[Y=1|HeartRate, Age]$ can create predicted response $\hat{Y}$ by thresholding
+Based on $\hat{\text{Pr}}[ASD=\text{YES}|MSEL=90]$ can create predicted response $\hat{ASD}$ by thresholding
 
 # # Logistic regression: confounding
 
