@@ -275,7 +275,7 @@ $$
 
 Based on $\hat{\text{Pr}}[ASD=\text{YES}|MSEL=90]$ can create predicted response $\hat{ASD}$ by thresholding
 
-# # Logistic regression: confounding
+# Logistic regression: confounding
 
 **Example**: Credit Card Default Rate
 
