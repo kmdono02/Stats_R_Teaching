@@ -86,15 +86,17 @@ brain_data_v24 <-
 p.mat_v12 <- cor_pmat(brain_data_v12)
 p.mat_v24 <- cor_pmat(brain_data_v24)
 
-heatmaps <- list(ggcorrplot(cor(x=p.mat_v12, method="pearson", use="pairwise.complete.obs"), 
+heatmaps <- list(ggcorrplot(cor(x=brain_data_v12, method="pearson", use="pairwise.complete.obs"), 
            hc.order = TRUE, type = "lower", lab = TRUE, outline.col = "white",
-           p.mat = p.mat)
+           p.mat = p.mat_v12)
            ,
-           ggcorrplot(cor(x=p.mat_v24, method="pearson", use="pairwise.complete.obs"), 
+           ggcorrplot(cor(x=brain_data_v24, method="pearson", use="pairwise.complete.obs"), 
            hc.order = TRUE, type = "lower", lab = TRUE, outline.col = "white",
-           p.mat = p.mat))
+           p.mat = p.mat_v24)+
+             theme(axis.text.y = element_blank()))
 
-ggarrange(plotlist=heatmaps, labels = c("12 months", "24 months"))
+ggarrange(plotlist=heatmaps, labels = c("12 months", "24 months"),
+          common.legend = TRUE, legend = "bottom")
 ```
 
 Lines of best fit with correlations
@@ -122,7 +124,7 @@ brain_data_v24 <-
 ggpairs(brain_data_v24, 
         columns = names(brain_data_v24)[!grepl("RiskGroup", names(brain_data_v24))],
         ggplot2::aes(colour=RiskGroup, alpha=0.25)) +
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=2))
 ```
 
 # Summary statistics 
