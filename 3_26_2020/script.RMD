@@ -27,6 +27,11 @@ library(GGally)
 library(ggcorrplot)
 library(lsmeans)
 library(sjPlot)
+library(r2glmm)
+library(effsize)
+library(ggfortify)
+library(esvis)
+library(ppcor)
 ```
 
 ```{r}
@@ -165,8 +170,7 @@ effectsize::cohens_f_squared(lm_fit, ci=0.95, partial = FALSE)
 ### Effect sizes
 
 ```{r}
-lm_fit <- lm(V24_MSEL_EL_ae~RiskGroup+RightAmygdala_V24+
-               RightAmygdala_V24, 
+lm_fit <- lm(V24_MSEL_EL_ae~RiskGroup+RightAmygdala_V24, 
              data=brain_data)
 lm_fit_tidy <- tidy(lm_fit)
 
@@ -186,6 +190,8 @@ partial_eta_2/(1-partial_eta_2)
 effectsize::cohens_f_squared(lm_fit, ci=0.95)
 
 # Now try adjusted Cohen's D
+# Source: Lipsey and Wilson's (2001) book, Practical Meta-analysis, Appendix B
+# From https://stats.stackexchange.com/questions/348502/cohens-d-from-a-linear-regression-model
 brain_data_noLR <- brain_data %>% filter(RiskGroup!="LR-Neg")
 lm_fit <- lm(V24_MSEL_EL_ae~RiskGroup+RightAmygdala_V24, 
              data=brain_data_noLR)
@@ -221,6 +227,10 @@ spcors_lm <-
           dplyr::select(V24_MSEL_EL_ae, RiskGroup, RightAmygdala_V24, TBV_V24) %>%
           mutate(RiskGroup=as.numeric(factor(RiskGroup))) %>%
           drop_na())
+
+# NOTE: can't have missing values and all variables must be numeric
+# crudely converted diagnosis to numeric, should manually create dummy variables
+# instead
 spcors_lm_est <- spcors_lm$estimate
 spcors_p_val <- spcors_lm$p.value
 
@@ -239,8 +249,21 @@ mixed_fit <-
     na.action = na.omit)
 
 # Can tidy using broom.mixed package
-tidy(mixed_fit) %>%
+fixed_effects <- 
+  tidy(mixed_fit) %>%
   filter(effect=="fixed") %>%
-  select(-effect, -group) %>%
-  flextable()
+  select(-effect, -group)
+
+# Semi partial R^2 from r2glmm package
+# Best measure in my opinion, accurate for any mixed model/generalized mixed model
+semi_partial_r2_mixed <- r2beta(mixed_fit)
+plot(semi_partial_r2_mixed)
+
+# Adjusted Cohen's D: AD HOC, not the best method in general (only valid in specific samples)
+# Source: https://www.researchgate.net/publication/264627622_Statistical_Power_and_Optimal_Design_in_Experiments_in_Which_Samples_of_Participants_Respond_to_Samples_of_Stimuli
+random_effect_var <- 
+  tidy(mixed_fit)
+
+se_pooled <- sqrt((random_effect_var$estimate[4])^2+(random_effect_var$estimate[5])^2)
+adjUsted_cohensd_mixed <- fixed_effects$estimate[3]/se_pooled
 ```
