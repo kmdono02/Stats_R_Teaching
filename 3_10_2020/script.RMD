@@ -1,5 +1,5 @@
 ---
-title: "Presenting Regression Analyses in R: Part 2"
+title: "Presenting Regression Analyses in R"
 author: "Kevin Donovan"
 date: "`r format(Sys.time(), '%B %d, %Y')`"
 output: html_document
@@ -8,11 +8,6 @@ output: html_document
 knitr::opts_chunk$set(echo=FALSE, message = FALSE, warning = FALSE, fig.width = 8, 
                       fig.height = 4)
 
-library(r2glmm)
-library(effsize)
-library(ggfortify)
-library(esvis)
-library(ppcor)
 library(tidyverse)
 library(shiny)
 library(rmarkdown)
@@ -24,6 +19,7 @@ library(nlme)
 library(lme4)
 library(broom.mixed)
 library(GGally)
+library(corrplot)
 library(ggcorrplot)
 library(lsmeans)
 library(sjPlot)
@@ -65,13 +61,18 @@ brain_data_v24 <-
   select(names(brain_data)[grepl("V24", names(brain_data))]) %>%
   select(EACSF_V24:RightAmygdala_V24 )
 
+p.mat <- cor_pmat(brain_data_v24)
+
 ggcorrplot(cor(x=brain_data_v24, method="pearson", use="pairwise.complete.obs"), 
-           hc.order = TRUE, type = "lower", lab = TRUE, outline.col = "white")
+           hc.order = TRUE, type = "lower", lab = TRUE, outline.col = "white",
+           p.mat = p.mat)
+
+corrplot(cor(x=brain_data_v24, method="pearson", use="pairwise.complete.obs"))
 ```
 
 Grid of heat maps
 
-```{r fig.width = 10, fig.height = 8}
+```{r fig.width = 7, fig.height = 6}
 brain_data_v12 <-
   brain_data %>%
   select(names(brain_data)[grepl("V12", names(brain_data))]) %>%
@@ -87,149 +88,102 @@ p.mat_v24 <- cor_pmat(brain_data_v24)
 
 heatmaps <- list(ggcorrplot(cor(x=brain_data_v12, method="pearson", use="pairwise.complete.obs"), 
            hc.order = TRUE, type = "lower", lab = TRUE, outline.col = "white",
-           p.mat = p.mat_v12)+
-           labs(title = "12 months")
+           p.mat = p.mat_v12)
            ,
            ggcorrplot(cor(x=brain_data_v24, method="pearson", use="pairwise.complete.obs"), 
            hc.order = TRUE, type = "lower", lab = TRUE, outline.col = "white",
            p.mat = p.mat_v24)+
-           labs(title = "24 months"))
+             theme(axis.text.y = element_blank()))
 
-ggarrange(plotlist=heatmaps,
+ggarrange(plotlist=heatmaps, labels = c("12 months", "24 months"),
           common.legend = TRUE, legend = "bottom")
 ```
 
-# Summary statistics 
-- Can create easily formatted summary stats tables **in code** and add effect sizes
-- Can use any effect size formula of interest
+Lines of best fit with correlations
+
+```{r fig.width = 7, fig.height = 6}
+ggplot(mixed_model_data, mapping=aes(x=Visit_Num, y=Mullen_Composite_Score,
+                                     color=ASD_Diag))+
+  geom_point()+
+  geom_smooth(method="lm", se=FALSE)+
+  facet_grid(~Gender)+
+  stat_cor()+
+  theme_bw()
+```
+
+# Correlation analyses
+
+Matrix of distribution summary visuals
 
 ```{r fig.width = 10, fig.height = 8}
 brain_data_v24 <-
   brain_data %>%
   select(c(names(brain_data)[grepl("V24", names(brain_data))], "RiskGroup")) %>%
-  select(EACSF_V24:RightAmygdala_V24, RiskGroup) %>%
-  filter(RiskGroup%in%c("HR-ASD", "HR-Neg"))
+  select(EACSF_V24:RightAmygdala_V24, RiskGroup)
 
-# Create effect size function using Cohen's d
-my_EStest <- function(data, variable, by, ...) {
-  d <- effsize::cohen.d(data[[variable]] ~ as.factor(data[[by]]), 
-                   conf.level=.95, pooled=TRUE, paired=FALSE, 
-                   hedges.correction=TRUE)
-  
-  # Formatting statistic with CI
-  est <- round(d$estimate, 2)
-  ci <- round(d$conf.int, 2) %>% paste(collapse = ", ")
+ggpairs(brain_data_v24, 
+        columns = names(brain_data_v24)[!grepl("RiskGroup", names(brain_data_v24))],
+        ggplot2::aes(colour=RiskGroup, alpha=0.25)) +
+  theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=2))
+```
 
-  # returning estimate with CI together
-  str_glue("{est} ({ci})")
-}
+# Summary statistics 
+- Can create easily formatted summary stats tables **in code**
 
+```{r fig.width = 10, fig.height = 8}
 tbl_summary(data=brain_data_v24, by=RiskGroup,
             missing_text = "Missing",
             statistic = list(all_continuous() ~ "{mean} ({sd})")) %>%
   add_p(list(all_continuous() ~ "aov", 
              all_categorical() ~ "chisq")) %>%
   add_n() %>%
-  add_stat(
-    fns = everything() ~ my_EStest,
-    fmt_fun = NULL,
-    header = "**ES (95% CI)**"
-  ) %>%
-  modify_footnote(add_stat_1 ~ "Cohen's D (95% CI)") %>%
   as_flex_table() %>%
   bold(bold = TRUE, part = "header") %>%
   autofit()
 ```
 
 # Regression summaries
-## Linear Models
-### F and t-test
-
-```{r}
-# Pairwise differences: Cohen's D
-cohen_d <- coh_d(V24_MSEL_EL_ae~RiskGroup, 
-             data=brain_data)
-
-# Now construct Cohen's F^2
-lm_fit <- lm(V24_MSEL_EL_ae~RiskGroup,
-             data=brain_data)
-
-# 1. By hand
-sum_of_sq_table <- anova(lm_fit)
-eta_2 <- sum_of_sq_table$`Sum Sq`[1]/(sum(sum_of_sq_table$`Sum Sq`))
-eta_2/(1-eta_2)
-
-# 2. Using package
-effectsize::cohens_f_squared(lm_fit, ci=0.95, partial = FALSE)
-```
-### Effect sizes
+## Tables
+### Linear Models
 
 ```{r}
 lm_fit <- lm(V24_MSEL_EL_ae~RiskGroup+RightAmygdala_V24+
-               RightAmygdala_V24, 
+               RiskGroup*RightAmygdala_V24, 
              data=brain_data)
+
+tbl_regression(lm_fit,
+               pvalue_fun = ~style_pvalue(.x, digits = 3),
+               estimate_fun = ~style_number(.x, digits = 3)) %>%
+  as_flex_table() %>%
+  autofit()
+
+# Can also do by hand using tidy()
 lm_fit_tidy <- tidy(lm_fit)
-
-# Least square means
-ls_means_df <- 
-  lsmeans(lm_fit, "RiskGroup",
-          at = list(RightAmygdala_V24=mean(brain_data$RightAmygdala_V24,
-                                           na.rm=TRUE))) %>% data.frame()
-
-# Now construct partial Cohen's F^2
-# 1. By hand
-sum_of_sq_table <- anova(lm_fit)
-partial_eta_2 <- sum_of_sq_table$`Sum Sq`[1]/(sum(sum_of_sq_table$`Sum Sq`))
-partial_eta_2/(1-partial_eta_2)
-
-# 2. Using package
-effectsize::cohens_f_squared(lm_fit, ci=0.95)
-
-# Now try adjusted Cohen's D
-brain_data_noLR <- brain_data %>% filter(RiskGroup!="LR-Neg")
-lm_fit <- lm(V24_MSEL_EL_ae~RiskGroup+RightAmygdala_V24, 
-             data=brain_data_noLR)
-
-N <- dim(brain_data_noLR)[1]
-n1 <- sum(brain_data_noLR$RiskGroup=="HR-ASD")
-n2 <- N - n1
-      
-group_estimate <- 
-  summary(lm_fit)$coef["RiskGroupHR-Neg","Estimate"] 
-
-model_df <- model.frame(V24_MSEL_EL_ae~RiskGroup+RightAmygdala_V24, brain_data_noLR)
-
-pooled_se_lm <-
-  (var(model_df[,1])*(N-1)-((group_estimate)^2)*(n1*n2/(n1+n2)))/N
-      
-group_estimate/pooled_se_lm
+lm_fit_tidy
 ```
 
-### Semi-partial correlation
+### Generalized Linear Models
+
 ```{r}
-brain_data_v24 <-
-  brain_data %>%
-  select(c(names(brain_data)[grepl("V24", names(brain_data))], "RiskGroup")) %>%
-  select(EACSF_V24:RightAmygdala_V24, V24_MSEL_EL_ae, RiskGroup)
+glm_fit <- glm(V24_ASD_DX_edit~V24_MSEL_EL_ae+RightAmygdala_V24+Cand_Sex, 
+               family=binomial(),
+             data=brain_data)
 
-lm_fit <- lm(V24_MSEL_EL_ae~RiskGroup+RightAmygdala_V24+TBV_V24, 
-             data=brain_data_v24)
-summary(lm_fit)
+tbl_regression(glm_fit,
+               pvalue_fun = ~style_pvalue(.x, digits = 3),
+               estimate_fun = ~style_number(.x, digits = 4)) %>%
+  as_flex_table() %>%
+  autofit()
 
-spcors_lm <- 
-  spcor(brain_data_v24 %>% 
-          dplyr::select(V24_MSEL_EL_ae, RiskGroup, RightAmygdala_V24, TBV_V24) %>%
-          mutate(RiskGroup=as.numeric(factor(RiskGroup))) %>%
-          drop_na())
-spcors_lm_est <- spcors_lm$estimate
-spcors_p_val <- spcors_lm$p.value
-
-ggcorrplot(spcors_lm_est, 
-           hc.order = TRUE, type = "full", lab = TRUE, outline.col = "white",
-           p.mat = spcors_p_val)
+tbl_regression(glm_fit,
+               pvalue_fun = ~style_pvalue(.x, digits = 3),
+               estimate_fun = ~style_number(.x, digits = 4),
+               exponentiate = TRUE) %>%
+  as_flex_table() %>%
+  autofit()
 ```
 
-## Mixed Models
+### Mixed Models
 
 ```{r}
 mixed_fit <-
@@ -243,4 +197,63 @@ tidy(mixed_fit) %>%
   filter(effect=="fixed") %>%
   select(-effect, -group) %>%
   flextable()
+```
+
+## Visualizations
+### Linear Models
+
+```{r}
+lm_fit <- lm(V24_MSEL_EL_ae~RiskGroup+RightAmygdala_V24+
+               RiskGroup*RightAmygdala_V24, 
+             data=brain_data)
+
+model_data <- model.frame(lm_fit)
+model_data$predict_MSEL <- predict(lm_fit, newdata=model_data)
+
+# Now plot trend line
+# Method 1
+ggplot(data=model_data,
+       mapping=aes(x=RightAmygdala_V24, y=V24_MSEL_EL_ae, color=RiskGroup))+
+  geom_point()+
+  geom_line(mapping=aes(y=predict_MSEL), size=1.5)+
+  theme_bw()
+
+# Method 2
+ggplot(data=brain_data,
+       mapping=aes(x=RightAmygdala_V24, y=V24_MSEL_EL_ae, color=RiskGroup))+
+  geom_point()+
+  geom_smooth(method="lm", se=FALSE, size=1.5)+
+  theme_bw()
+
+# Least square means
+ls_means_df <- lsmeans(lm_fit, "RiskGroup",
+                       at = list(RightAmygdala_V24=mean(brain_data$RightAmygdala_V24,
+                                                        na.rm=TRUE))) %>% data.frame()
+
+ggplot(data=ls_means_df,
+       mapping=aes(x=RiskGroup, y=lsmean, color=RiskGroup))+
+  geom_point()+
+  geom_errorbar(mapping=aes(ymin=`lower.CL`, ymax=`upper.CL`))+
+  theme_bw()
+```
+
+### Generalized Linear Models
+
+```{r}
+glm_fit <- glm(V24_ASD_DX_edit~V24_MSEL_EL_ae+RightAmygdala_V24+Cand_Sex, 
+               family=binomial(),
+             data=brain_data)
+
+# Creating a forest plot
+plot_model(glm_fit)
+
+# Creating a forest plot by hand
+glm_fit_tidy <- tidy(glm_fit)
+confints_glm <- confint(glm_fit)
+
+glm_fit_tidy <- cbind(glm_fit_tidy, confints_glm) %>%
+  mutate(or_est = exp(estimate),
+         or_lci = exp(`2.5 %`),
+          or_uci = exp(`97.5 %`)) %>%
+  filter(term!="(Intercept)")
 ```
