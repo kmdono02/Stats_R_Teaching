@@ -19,6 +19,7 @@ library(vcd)
 library(effsize)
 library(ggfortify)
 library(irr)
+library(summarytools)
 ```
 
 ```{r}
@@ -58,6 +59,8 @@ ibis_data <- read_csv("../Data/Cross-sec_full.csv")
 ```{r}
 addmargins(table(ibis_data$SSM_ASD_v24, ibis_data$Gender))
 addmargins(prop.table(table(ibis_data$SSM_ASD_v24, ibis_data$Gender)))
+
+freq(x=ibis_data$SSM_ASD_v24)
 ```
 
 # Testing for independence
@@ -78,7 +81,7 @@ addmargins(prop.table(table(ibis_data$SSM_ASD_v24, ibis_data$Gender)))
 
 ```{r}
 table_xtabs <- xtabs(~SSM_ASD_v24+Gender, data=ibis_data)
-summary(table_xtabs)
+blah <- summary(table_xtabs)
 ``` 
 
 # Fisher's Exact Test
