@@ -542,7 +542,7 @@ rf_fit <- train(as.formula(paste0("V24_VDQ", "~", paste0(all_image_vars_v12, col
              method='rf',
              metric='accuracy',
              trControl=trainControl(method="cv", number=5),
-             tuneGrid=expand.grid(mtry=1:5),
+             tuneGrid=expand.grid(mtry=1:5, ntree=c(100, 200, 300, 400, 500)),
              ntree = 500)
 
 # Look at mtry results
